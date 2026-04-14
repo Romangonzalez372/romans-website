@@ -1,11 +1,152 @@
-<script>
-let tasks=[];
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoPilot</title>
 
-/* ---------- TIME ENGINE (FIXED BUFFER MODEL) ---------- */
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+  font-family:Inter,sans-serif;
+  background:#0f0f10;
+  color:#fff;
+  display:flex;
+  justify-content:center;
+  padding:40px 20px;
+}
+
+.container{width:100%;max-width:520px;}
+
+.input{
+  display:flex;
+  gap:8px;
+  margin-bottom:10px;
+}
+
+input,select{
+  background:#18181a;
+  border:none;
+  border-radius:12px;
+  padding:10px;
+  color:white;
+  outline:none;
+}
+
+input.main{flex:1;}
+
+button{
+  background:#9eff6b;
+  border:none;
+  border-radius:12px;
+  padding:0 14px;
+  cursor:pointer;
+}
+
+/* TASK */
+.task{
+  background:#18181a;
+  border-radius:14px;
+  padding:12px;
+  margin-top:10px;
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  cursor:grab;
+}
+
+.check{
+  width:18px;height:18px;
+  border-radius:50%;
+  border:2px solid #666;
+  cursor:pointer;
+  margin-top:4px;
+  flex-shrink:0;
+}
+
+.check.active{
+  background:#9eff6b;
+  border-color:#9eff6b;
+}
+
+.content{flex:1;display:flex;flex-direction:column;gap:6px;}
+
+.time{
+  font-size:13px;
+  color:#9eff6b;
+  font-weight:500;
+}
+
+.title{
+  width:100%;
+  background:transparent;
+  border:none;
+  color:white;
+  font-size:14px;
+}
+
+.row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  font-size:11px;
+  color:#777;
+}
+
+.small{
+  width:50px;
+  background:transparent;
+  border:none;
+  color:#aaa;
+  font-size:11px;
+}
+
+.drag{
+  color:#555;
+  font-size:12px;
+  margin-top:4px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+  <div class="input">
+    <input id="input" class="main" placeholder="Add task...">
+
+    <select id="duration">
+      <option value="15">15m</option>
+      <option value="30" selected>30m</option>
+      <option value="45">45m</option>
+      <option value="60">60m</option>
+    </select>
+
+    <select id="buffer">
+      <option value="0">0m</option>
+      <option value="5">5m</option>
+      <option value="10" selected>10m</option>
+      <option value="15">15m</option>
+    </select>
+
+    <button onclick="addTask()">+</button>
+  </div>
+
+  <div id="list"></div>
+
+</div>
+
+<script>
+let tasks = [];
+
+/* ---------- CORE TIMELINE (STABLE) ---------- */
 function recalc(){
   let time = 0;
 
-  for(let i = 0; i < tasks.length; i++){
+  for(let i=0;i<tasks.length;i++){
     const t = tasks[i];
 
     if(t.done){
@@ -15,30 +156,25 @@ function recalc(){
 
     t.start = time;
 
-    const duration = Number(t.duration);
-    const buffer = Number(t.buffer);
-
-    time += duration;
-
-    // buffer applies AFTER task, affects NEXT task
-    time += buffer;
+    time += Number(t.duration);
+    time += Number(t.buffer);
   }
 }
 
 /* ---------- FORMAT ---------- */
 function format(min){
-  if(min==null) return '';
+  if(min == null) return '';
   if(min < 60) return `in ${min}m`;
-  const h = Math.floor(min / 60);
+  const h = Math.floor(min/60);
   const m = min % 60;
   return m === 0 ? `in ${h}h` : `in ${h}h ${m}m`;
 }
 
-/* ---------- ADD ---------- */
+/* ---------- ADD TASK ---------- */
 function addTask(){
-  const i=document.getElementById('input');
-  const d=document.getElementById('duration');
-  const b=document.getElementById('buffer');
+  const i = document.getElementById('input');
+  const d = document.getElementById('duration');
+  const b = document.getElementById('buffer');
 
   if(!i.value.trim()) return;
 
@@ -50,7 +186,7 @@ function addTask(){
     done: false
   });
 
-  i.value='';
+  i.value = '';
   recalc();
   render();
 }
@@ -64,8 +200,8 @@ function toggle(id){
   render();
 }
 
-/* ---------- SAFE EDIT (ONLY ON ENTER/BLUR) ---------- */
-function commitUpdate(id, field, el){
+/* ---------- SAFE EDIT (ENTER / BLUR ONLY) ---------- */
+function commit(id, field, el){
   const t = tasks.find(x=>x.id===id);
   if(!t) return;
 
@@ -80,32 +216,32 @@ function commitUpdate(id, field, el){
 }
 
 /* ---------- DRAG ---------- */
-let drag=null;
+let dragId = null;
 
-function dragStart(id){ drag=id; }
+function dragStart(id){ dragId = id; }
 
 function allow(e){ e.preventDefault(); }
 
 function drop(id){
-  if(drag===null || drag===id) return;
+  if(dragId === null || dragId === id) return;
 
-  const a = tasks.findIndex(t=>t.id===drag);
-  const b = tasks.findIndex(t=>t.id===id);
+  const from = tasks.findIndex(t=>t.id===dragId);
+  const to = tasks.findIndex(t=>t.id===id);
 
-  const item = tasks.splice(a,1)[0];
-  tasks.splice(b,0,item);
+  const item = tasks.splice(from,1)[0];
+  tasks.splice(to,0,item);
 
-  drag=null;
+  dragId = null;
   recalc();
   render();
 }
 
 /* ---------- RENDER ---------- */
 function render(){
-  const list=document.getElementById('list');
+  const list = document.getElementById('list');
 
-  if(!tasks.length){
-    list.innerHTML='no tasks';
+  if(tasks.length === 0){
+    list.innerHTML = '';
     return;
   }
 
@@ -125,18 +261,18 @@ function render(){
         <input class="title"
           value="${t.title}"
           onkeydown="if(event.key==='Enter'){this.blur()}"
-          onblur="commitUpdate(${t.id},'title',this)">
+          onblur="commit(${t.id},'title',this)">
 
         <div class="row">
           <input class="small"
             value="${t.duration}"
             onkeydown="if(event.key==='Enter'){this.blur()}"
-            onblur="commitUpdate(${t.id},'duration',this)">m
+            onblur="commit(${t.id},'duration',this)">m
 
           <input class="small"
             value="${t.buffer}"
             onkeydown="if(event.key==='Enter'){this.blur()}"
-            onblur="commitUpdate(${t.id},'buffer',this)">b
+            onblur="commit(${t.id},'buffer',this)">b
         </div>
 
       </div>
@@ -146,9 +282,12 @@ function render(){
   `).join('');
 }
 
-document.getElementById('input').addEventListener('keydown',e=>{
-  if(e.key==='Enter') addTask();
+document.getElementById('input').addEventListener('keydown', e=>{
+  if(e.key === 'Enter') addTask();
 });
 
 render();
 </script>
+
+</body>
+</html>
