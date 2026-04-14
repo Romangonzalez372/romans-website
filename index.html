@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
 
 <style>
-* { box-sizing: border-box; margin:0; padding:0; }
+*{box-sizing:border-box;margin:0;padding:0;}
 
 :root{
   --bg:#0f0f10;
@@ -19,37 +19,20 @@
 }
 
 body{
-  font-family: 'Inter', sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family:Inter,sans-serif;
+  background:var(--bg);
+  color:var(--text);
   display:flex;
   justify-content:center;
   padding:40px 20px;
 }
 
-.container{
-  width:100%;
-  max-width:480px;
-}
+.container{max-width:480px;width:100%;}
 
-/* header */
-.header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:20px;
-}
+.header{margin-bottom:20px;}
+.logo{font-weight:500;}
+.logo span{color:var(--accent);}
 
-.logo{
-  font-weight:500;
-  letter-spacing:-0.5px;
-}
-
-.logo span{
-  color:var(--accent);
-}
-
-/* input */
 .input-wrap{
   display:flex;
   gap:10px;
@@ -72,10 +55,8 @@ button{
   padding:0 16px;
   border-radius:12px;
   cursor:pointer;
-  font-size:18px;
 }
 
-/* task */
 .task{
   background:var(--card);
   border-radius:16px;
@@ -84,23 +65,14 @@ button{
   display:flex;
   align-items:center;
   gap:12px;
-  transition:0.2s;
 }
 
-.task.done{
-  opacity:0.35;
-}
+.task.done{opacity:0.35;}
 
-/* rounded checkbox */
 .check{
-  width:20px;
-  height:20px;
-  border-radius:50%;
+  width:20px;height:20px;border-radius:50%;
   border:2px solid var(--muted);
   cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
 }
 
 .check.active{
@@ -108,48 +80,31 @@ button{
   border-color:var(--accent);
 }
 
-.check.active::after{
-  content:'';
-  width:5px;
-  height:9px;
-  border:2px solid black;
-  border-top:none;
-  border-left:none;
-  transform:rotate(45deg);
-}
+.content{flex:1;}
 
-/* content */
-.content{
-  flex:1;
-}
-
-.title{
-  font-size:14px;
-}
+.title{font-size:14px;}
 
 .meta{
   font-size:12px;
   color:var(--muted);
-  margin-top:2px;
+  display:flex;
+  gap:10px;
+  align-items:center;
 }
 
-/* subtle badge dot */
-.badge{
-  width:8px;
-  height:8px;
-  border-radius:50%;
+/* duration input */
+.duration{
+  width:50px;
+  background:transparent;
+  border:none;
+  color:var(--accent);
+  font-size:12px;
 }
 
-.badge.now{ background:#9eff6b; }
-.badge.soon{ background:#ffd36b; }
-.badge.later{ background:#666; }
-
-/* empty */
 .empty{
   text-align:center;
   color:var(--muted);
   margin-top:60px;
-  font-size:14px;
 }
 </style>
 </head>
@@ -162,7 +117,7 @@ button{
   </div>
 
   <div class="input-wrap">
-    <input id="input" placeholder="Add task..." />
+    <input id="input" placeholder="Add task...">
     <button onclick="addTask()">+</button>
   </div>
 
@@ -173,72 +128,87 @@ button{
 <script>
 const tasks = [];
 
-/* -------- TIME SYSTEM -------- */
+/* -------- FORMAT TIME -------- */
 
-function getDelay(base, spacing=15){
-  return base + tasks.filter(t=>!t.done).length * spacing;
-}
-
-function format(minutes){
-  if(minutes<60) return `in ${minutes}m`;
-  const h=Math.floor(minutes/60);
-  const m=minutes%60;
+function format(min){
+  if(min < 60) return `in ${min}m`;
+  const h = Math.floor(min/60);
+  const m = min%60;
   if(m===0) return `in ${h}h`;
   return `in ${h}h ${m}m`;
+}
+
+/* -------- REBUILD TIMELINE -------- */
+
+function recalcTimes(){
+  let current = 0;
+
+  tasks.forEach(t=>{
+    if(!t.done){
+      t.start = current;
+      current += t.duration;
+    }
+  });
 }
 
 /* -------- SCHEDULER -------- */
 
 function schedule(text){
-  const t=text.toLowerCase();
+  let duration = 30;
 
-  let base=60, badge='later';
+  const t = text.toLowerCase();
 
-  if(t.includes('now')||t.includes('urgent')){
-    base=5; badge='now';
-  }
-  else if(t.includes('study')||t.includes('homework')){
-    base=30; badge='now';
-  }
-  else if(t.includes('clean')||t.includes('laundry')){
-    base=45; badge='soon';
-  }
-
-  const delay=getDelay(base);
+  if(t.includes('study')) duration = 60;
+  if(t.includes('clean')) duration = 45;
+  if(t.includes('quick')) duration = 15;
 
   return {
-    id:Date.now(),
-    title:text,
-    time:format(delay),
-    badge,
-    done:false
+    id: Date.now(),
+    title: text,
+    duration,
+    start: 0,
+    done: false
   };
 }
 
 /* -------- ACTIONS -------- */
 
 function addTask(){
-  const input=document.getElementById('input');
+  const input = document.getElementById('input');
   if(!input.value.trim()) return;
 
   tasks.push(schedule(input.value));
   input.value='';
+
+  recalcTimes();
   render();
 }
 
 function toggle(id){
-  const t=tasks.find(x=>x.id===id);
-  if(t) t.done=!t.done;
+  const t = tasks.find(x=>x.id===id);
+  if(t) t.done = !t.done;
+
+  recalcTimes();
+  render();
+}
+
+function updateDuration(id, val){
+  const t = tasks.find(x=>x.id===id);
+  if(t){
+    t.duration = Math.max(5, parseInt(val) || 5);
+  }
+
+  recalcTimes();
   render();
 }
 
 /* -------- RENDER -------- */
 
 function render(){
-  const list=document.getElementById('list');
+  const list = document.getElementById('list');
 
   if(tasks.length===0){
-    list.innerHTML='<div class="empty">no tasks yet</div>';
+    list.innerHTML='<div class="empty">no tasks</div>';
     return;
   }
 
@@ -248,10 +218,13 @@ function render(){
 
       <div class="content">
         <div class="title">${t.title}</div>
-        <div class="meta">${t.time}</div>
+        <div class="meta">
+          ${format(t.start)}
+          •
+          <input class="duration" value="${t.duration}" 
+            onchange="updateDuration(${t.id}, this.value)">m
+        </div>
       </div>
-
-      <div class="badge ${t.badge}"></div>
     </div>
   `).join('');
 }
@@ -262,6 +235,5 @@ document.getElementById('input').addEventListener('keydown', e=>{
 
 render();
 </script>
-
 </body>
 </html>
