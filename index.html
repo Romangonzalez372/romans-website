@@ -1,133 +1,267 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>AutoPilot Life</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoPilot</title>
 
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Instrument+Serif&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
 
 <style>
-/* (unchanged styles — kept your exact design) */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg:#0d0d0d; --surface:#141414; --surface2:#1c1c1c;
-  --border:rgba(255,255,255,0.07); --border-hover:rgba(255,255,255,0.14);
-  --text:#f0ede6; --muted:rgba(240,237,230,0.45); --faint:rgba(240,237,230,0.2);
-  --accent:#b8f066; --accent-dim:rgba(184,240,102,0.12); --accent-border:rgba(184,240,102,0.3);
-  --mono:'DM Mono', monospace; --serif:'Instrument Serif', serif;
+* { box-sizing: border-box; margin:0; padding:0; }
+
+:root{
+  --bg:#0f0f10;
+  --card:#18181a;
+  --text:#f5f5f5;
+  --muted:#7a7a7a;
+  --accent:#9eff6b;
 }
-html { background:var(--bg); color:var(--text); font-family:var(--mono); }
-.container { max-width:560px; margin:auto; padding:2rem; }
-.logo { font-family:var(--serif); font-size:26px; }
-.logo span { color:var(--accent); }
-.task-input { width:100%; padding:10px; margin-top:10px; background:var(--surface); color:white; border:1px solid var(--border);}
-.add-btn { margin-top:10px; padding:10px; background:var(--accent); border:none; cursor:pointer;}
-.task-card { background:var(--surface); margin-top:10px; padding:10px; border-radius:6px;}
+
+body{
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display:flex;
+  justify-content:center;
+  padding:40px 20px;
+}
+
+.container{
+  width:100%;
+  max-width:480px;
+}
+
+/* header */
+.header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:20px;
+}
+
+.logo{
+  font-weight:500;
+  letter-spacing:-0.5px;
+}
+
+.logo span{
+  color:var(--accent);
+}
+
+/* input */
+.input-wrap{
+  display:flex;
+  gap:10px;
+  margin-bottom:20px;
+}
+
+input{
+  flex:1;
+  background:var(--card);
+  border:none;
+  padding:14px;
+  border-radius:12px;
+  color:white;
+  outline:none;
+}
+
+button{
+  background:var(--accent);
+  border:none;
+  padding:0 16px;
+  border-radius:12px;
+  cursor:pointer;
+  font-size:18px;
+}
+
+/* task */
+.task{
+  background:var(--card);
+  border-radius:16px;
+  padding:14px;
+  margin-bottom:10px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  transition:0.2s;
+}
+
+.task.done{
+  opacity:0.35;
+}
+
+/* rounded checkbox */
+.check{
+  width:20px;
+  height:20px;
+  border-radius:50%;
+  border:2px solid var(--muted);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.check.active{
+  background:var(--accent);
+  border-color:var(--accent);
+}
+
+.check.active::after{
+  content:'';
+  width:5px;
+  height:9px;
+  border:2px solid black;
+  border-top:none;
+  border-left:none;
+  transform:rotate(45deg);
+}
+
+/* content */
+.content{
+  flex:1;
+}
+
+.title{
+  font-size:14px;
+}
+
+.meta{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:2px;
+}
+
+/* subtle badge dot */
+.badge{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+}
+
+.badge.now{ background:#9eff6b; }
+.badge.soon{ background:#ffd36b; }
+.badge.later{ background:#666; }
+
+/* empty */
+.empty{
+  text-align:center;
+  color:var(--muted);
+  margin-top:60px;
+  font-size:14px;
+}
 </style>
 </head>
 
 <body>
 <div class="container">
-  <div class="logo">Auto<span>Pilot</span> Life</div>
 
-  <input id="task-input" class="task-input" placeholder="Add a task..."/>
-  <button class="add-btn" onclick="addTask()">Add</button>
+  <div class="header">
+    <div class="logo">Auto<span>Pilot</span></div>
+  </div>
 
-  <div id="task-list"></div>
+  <div class="input-wrap">
+    <input id="input" placeholder="Add task..." />
+    <button onclick="addTask()">+</button>
+  </div>
+
+  <div id="list"></div>
+
 </div>
 
 <script>
 const tasks = [];
 
-/* ---------- NEW TIME SYSTEM ---------- */
+/* -------- TIME SYSTEM -------- */
 
-function getStaggeredDelay(baseMinutes, spacing = 15) {
-  const active = tasks.filter(t => !t.done);
-  return baseMinutes + active.length * spacing;
+function getDelay(base, spacing=15){
+  return base + tasks.filter(t=>!t.done).length * spacing;
 }
 
-function formatDelay(minutes) {
-  if (minutes < 60) return `In ${minutes} minutes`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (m === 0) return `In ${h} hour${h > 1 ? 's' : ''}`;
-  return `In ${h}h ${m}m`;
+function format(minutes){
+  if(minutes<60) return `in ${minutes}m`;
+  const h=Math.floor(minutes/60);
+  const m=minutes%60;
+  if(m===0) return `in ${h}h`;
+  return `in ${h}h ${m}m`;
 }
 
-/* ---------- SMART SCHEDULER ---------- */
+/* -------- SCHEDULER -------- */
 
-function scheduleTask(text) {
-  const t = text.toLowerCase();
+function schedule(text){
+  const t=text.toLowerCase();
 
-  let base = 60;
-  let badge = 'later';
-  let reason = 'Scheduled automatically.';
+  let base=60, badge='later';
 
-  if (t.includes('urgent') || t.includes('now')) {
-    base = 5;
-    badge = 'now';
-    reason = 'Do this immediately.';
+  if(t.includes('now')||t.includes('urgent')){
+    base=5; badge='now';
   }
-  else if (t.includes('study') || t.includes('homework')) {
-    base = 30;
-    badge = 'now';
-    reason = 'Good focus window.';
+  else if(t.includes('study')||t.includes('homework')){
+    base=30; badge='now';
   }
-  else if (t.includes('clean') || t.includes('laundry')) {
-    base = 45;
-    badge = 'soon';
-    reason = 'Quick productivity task.';
+  else if(t.includes('clean')||t.includes('laundry')){
+    base=45; badge='soon';
   }
 
-  const delay = getStaggeredDelay(base);
+  const delay=getDelay(base);
 
   return {
-    id: Date.now(),
-    title: text,
-    scheduled: formatDelay(delay),
-    reason,
+    id:Date.now(),
+    title:text,
+    time:format(delay),
     badge,
-    done: false
+    done:false
   };
 }
 
-/* ---------- CORE FUNCTIONS ---------- */
+/* -------- ACTIONS -------- */
 
-function addTask() {
-  const input = document.getElementById('task-input');
-  if (!input.value.trim()) return;
+function addTask(){
+  const input=document.getElementById('input');
+  if(!input.value.trim()) return;
 
-  tasks.push(scheduleTask(input.value));
-  input.value = '';
+  tasks.push(schedule(input.value));
+  input.value='';
   render();
 }
 
-function toggleDone(id) {
-  const t = tasks.find(x => x.id === id);
-  if (t) t.done = !t.done;
+function toggle(id){
+  const t=tasks.find(x=>x.id===id);
+  if(t) t.done=!t.done;
   render();
 }
 
-function render() {
-  const list = document.getElementById('task-list');
+/* -------- RENDER -------- */
 
-  list.innerHTML = tasks.map(t => `
-    <div class="task-card" style="opacity:${t.done ? 0.4 : 1}">
-      <div><strong>${t.title}</strong></div>
-      <div>${t.scheduled}</div>
-      <div style="font-size:12px;color:gray">${t.reason}</div>
-      <button onclick="toggleDone(${t.id})">
-        ${t.done ? 'Undo' : 'Done'}
-      </button>
+function render(){
+  const list=document.getElementById('list');
+
+  if(tasks.length===0){
+    list.innerHTML='<div class="empty">no tasks yet</div>';
+    return;
+  }
+
+  list.innerHTML = tasks.map(t=>`
+    <div class="task ${t.done?'done':''}">
+      <div class="check ${t.done?'active':''}" onclick="toggle(${t.id})"></div>
+
+      <div class="content">
+        <div class="title">${t.title}</div>
+        <div class="meta">${t.time}</div>
+      </div>
+
+      <div class="badge ${t.badge}"></div>
     </div>
   `).join('');
 }
 
-/* enter key support */
-document.getElementById('task-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') addTask();
+document.getElementById('input').addEventListener('keydown', e=>{
+  if(e.key==='Enter') addTask();
 });
+
+render();
 </script>
+
 </body>
 </html>
