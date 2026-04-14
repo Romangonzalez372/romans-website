@@ -1,239 +1,154 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AutoPilot</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
-
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-
-:root{
-  --bg:#0f0f10;
-  --card:#18181a;
-  --text:#f5f5f5;
-  --muted:#7a7a7a;
-  --accent:#9eff6b;
-}
-
-body{
-  font-family:Inter,sans-serif;
-  background:var(--bg);
-  color:var(--text);
-  display:flex;
-  justify-content:center;
-  padding:40px 20px;
-}
-
-.container{max-width:480px;width:100%;}
-
-.header{margin-bottom:20px;}
-.logo{font-weight:500;}
-.logo span{color:var(--accent);}
-
-.input-wrap{
-  display:flex;
-  gap:10px;
-  margin-bottom:20px;
-}
-
-input{
-  flex:1;
-  background:var(--card);
-  border:none;
-  padding:14px;
-  border-radius:12px;
-  color:white;
-  outline:none;
-}
-
-button{
-  background:var(--accent);
-  border:none;
-  padding:0 16px;
-  border-radius:12px;
-  cursor:pointer;
-}
-
-.task{
-  background:var(--card);
-  border-radius:16px;
-  padding:14px;
-  margin-bottom:10px;
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-
-.task.done{opacity:0.35;}
-
-.check{
-  width:20px;height:20px;border-radius:50%;
-  border:2px solid var(--muted);
-  cursor:pointer;
-}
-
-.check.active{
-  background:var(--accent);
-  border-color:var(--accent);
-}
-
-.content{flex:1;}
-
-.title{font-size:14px;}
-
-.meta{
-  font-size:12px;
-  color:var(--muted);
-  display:flex;
-  gap:10px;
-  align-items:center;
-}
-
-/* duration input */
-.duration{
-  width:50px;
-  background:transparent;
-  border:none;
-  color:var(--accent);
-  font-size:12px;
-}
-
-.empty{
-  text-align:center;
-  color:var(--muted);
-  margin-top:60px;
-}
-</style>
-</head>
-
-<body>
-<div class="container">
-
-  <div class="header">
-    <div class="logo">Auto<span>Pilot</span></div>
-  </div>
-
-  <div class="input-wrap">
-    <input id="input" placeholder="Add task...">
-    <button onclick="addTask()">+</button>
-  </div>
-
-  <div id="list"></div>
-
-</div>
-
 <script>
-const tasks = [];
+let tasks=[];
 
-/* -------- FORMAT TIME -------- */
+/* ---------- TIME ENGINE (FIXED BUFFER MODEL) ---------- */
+function recalc(){
+  let time = 0;
 
-function format(min){
-  if(min < 60) return `in ${min}m`;
-  const h = Math.floor(min/60);
-  const m = min%60;
-  if(m===0) return `in ${h}h`;
-  return `in ${h}h ${m}m`;
-}
+  for(let i = 0; i < tasks.length; i++){
+    const t = tasks[i];
 
-/* -------- REBUILD TIMELINE -------- */
-
-function recalcTimes(){
-  let current = 0;
-
-  tasks.forEach(t=>{
-    if(!t.done){
-      t.start = current;
-      current += t.duration;
+    if(t.done){
+      t.start = null;
+      continue;
     }
-  });
+
+    t.start = time;
+
+    const duration = Number(t.duration);
+    const buffer = Number(t.buffer);
+
+    time += duration;
+
+    // buffer applies AFTER task, affects NEXT task
+    time += buffer;
+  }
 }
 
-/* -------- SCHEDULER -------- */
-
-function schedule(text){
-  let duration = 30;
-
-  const t = text.toLowerCase();
-
-  if(t.includes('study')) duration = 60;
-  if(t.includes('clean')) duration = 45;
-  if(t.includes('quick')) duration = 15;
-
-  return {
-    id: Date.now(),
-    title: text,
-    duration,
-    start: 0,
-    done: false
-  };
+/* ---------- FORMAT ---------- */
+function format(min){
+  if(min==null) return '';
+  if(min < 60) return `in ${min}m`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `in ${h}h` : `in ${h}h ${m}m`;
 }
 
-/* -------- ACTIONS -------- */
-
+/* ---------- ADD ---------- */
 function addTask(){
-  const input = document.getElementById('input');
-  if(!input.value.trim()) return;
+  const i=document.getElementById('input');
+  const d=document.getElementById('duration');
+  const b=document.getElementById('buffer');
 
-  tasks.push(schedule(input.value));
-  input.value='';
+  if(!i.value.trim()) return;
 
-  recalcTimes();
+  tasks.push({
+    id: Date.now() + Math.random(),
+    title: i.value,
+    duration: +d.value,
+    buffer: +b.value,
+    done: false
+  });
+
+  i.value='';
+  recalc();
   render();
 }
 
+/* ---------- TOGGLE ---------- */
 function toggle(id){
   const t = tasks.find(x=>x.id===id);
   if(t) t.done = !t.done;
 
-  recalcTimes();
+  recalc();
   render();
 }
 
-function updateDuration(id, val){
+/* ---------- SAFE EDIT (ONLY ON ENTER/BLUR) ---------- */
+function commitUpdate(id, field, el){
   const t = tasks.find(x=>x.id===id);
-  if(t){
-    t.duration = Math.max(5, parseInt(val) || 5);
-  }
+  if(!t) return;
 
-  recalcTimes();
+  const val = el.value;
+
+  if(field === 'title') t.title = val;
+  if(field === 'duration') t.duration = Math.max(5, +val || 5);
+  if(field === 'buffer') t.buffer = Math.max(0, +val || 0);
+
+  recalc();
   render();
 }
 
-/* -------- RENDER -------- */
+/* ---------- DRAG ---------- */
+let drag=null;
 
+function dragStart(id){ drag=id; }
+
+function allow(e){ e.preventDefault(); }
+
+function drop(id){
+  if(drag===null || drag===id) return;
+
+  const a = tasks.findIndex(t=>t.id===drag);
+  const b = tasks.findIndex(t=>t.id===id);
+
+  const item = tasks.splice(a,1)[0];
+  tasks.splice(b,0,item);
+
+  drag=null;
+  recalc();
+  render();
+}
+
+/* ---------- RENDER ---------- */
 function render(){
-  const list = document.getElementById('list');
+  const list=document.getElementById('list');
 
-  if(tasks.length===0){
-    list.innerHTML='<div class="empty">no tasks</div>';
+  if(!tasks.length){
+    list.innerHTML='no tasks';
     return;
   }
 
   list.innerHTML = tasks.map(t=>`
-    <div class="task ${t.done?'done':''}">
+    <div class="task"
+      draggable="true"
+      ondragstart="dragStart(${t.id})"
+      ondragover="allow(event)"
+      ondrop="drop(${t.id})">
+
       <div class="check ${t.done?'active':''}" onclick="toggle(${t.id})"></div>
 
       <div class="content">
-        <div class="title">${t.title}</div>
-        <div class="meta">
-          ${format(t.start)}
-          •
-          <input class="duration" value="${t.duration}" 
-            onchange="updateDuration(${t.id}, this.value)">m
+
+        <div class="time">${format(t.start)}</div>
+
+        <input class="title"
+          value="${t.title}"
+          onkeydown="if(event.key==='Enter'){this.blur()}"
+          onblur="commitUpdate(${t.id},'title',this)">
+
+        <div class="row">
+          <input class="small"
+            value="${t.duration}"
+            onkeydown="if(event.key==='Enter'){this.blur()}"
+            onblur="commitUpdate(${t.id},'duration',this)">m
+
+          <input class="small"
+            value="${t.buffer}"
+            onkeydown="if(event.key==='Enter'){this.blur()}"
+            onblur="commitUpdate(${t.id},'buffer',this)">b
         </div>
+
       </div>
+
+      <div class="drag">≡</div>
     </div>
   `).join('');
 }
 
-document.getElementById('input').addEventListener('keydown', e=>{
+document.getElementById('input').addEventListener('keydown',e=>{
   if(e.key==='Enter') addTask();
 });
 
 render();
 </script>
-</body>
-</html>
